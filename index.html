@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TnP Control Panel — IIT Madras</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f4f0; color: #1a1a1a; min-height: 100vh; }
+    :root {
+      --bg: #f4f4f0; --surface: #ffffff; --border: rgba(0,0,0,0.1);
+      --text: #1a1a1a; --muted: #666; --info-bg: #e8f0fe; --info-text: #1a56db;
+      --warn-bg: #fef3c7; --warn-text: #92400e; --success-bg: #d1fae5; --success-text: #065f46;
+      --danger-bg: #fee2e2; --danger-text: #991b1b;
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+// ============================================================
+// REPLACE THIS WITH YOUR APPS SCRIPT WEB APP URL AFTER DEPLOY
+// ============================================================
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbztmNtyf3HtMsGug_P128bF_Jed6Q2Sv-olV9U_2P18MkUtOC-XU5FVB8x1a1C3_1bGkA/exec";
+
+const BTECH_BRANCHES = [
+  "Aerospace Engineering","Chemical Engineering","Civil Engineering",
+  "Computer Science & Engineering","Electrical Engineering","Mechanical Engineering",
+  "Metallurgical & Materials Engineering","Naval Architecture & Ocean Engineering","Engineering Physics"
+];
+
+const MTECH_DATA = [
+  { parent: "Aerospace Engineering", children: [] },
+  { parent: "Applied Mechanics", children: ["Computational & Experimental Mechanics", "Biomedical Engineering"] },
+  { parent: "Biotechnology", children: ["Bioprocess Engineering", "Clinical Engineering"] },
+  { parent: "Chemical Engineering", children: ["Chemical Engineering", "Catalysis Engineering"] },
+  { parent: "Civil Engineering", children: ["Building Technology & Construction Mgmt.", "Environmental Engineering", "Geotechnical Engineering", "Hydraulics & Water Resources Engineering", "Structural Engineering", "Transportation Engineering", "Construction Technology & Management-UoP", "Atmospheric and Climate Sciences"] },
+  { parent: "Computer Science & Engineering", children: [] },
+  { parent: "Electrical Engineering", children: ["Communication & Signal Processing", "Power Systems & Power Electronics", "Micro Electronics & VLSI Design", "Control and Instrumentation", "Micro Electronics & Photonics", "Integrated Circuits & Systems"] },
+  { parent: "Mathematics", children: ["Industrial Mathematics & Scientific Computing"] },
+  { parent: "Mechanical Engineering", children: ["Thermal Engineering", "Mechanical Design", "Manufacturing Engineering"] },
+  { parent: "Metallurgical & Materials Engineering", children: [] },
+  { parent: "Ocean Engineering", children: ["Ocean Structure", "Ocean Technology", "Offshore Technology – UoP", "Petroleum Engineering"] },
+  { parent: "Physics", children: ["Functional Materials & Nanotechnology"] },
+];
+
+const api = async (action, params = {}) => {
+  const url = new URL(APPS_SCRIPT_URL);
+  url.searchParams.set("action", action);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString());
+  return res.json();
+};
+
+// ── Branch Selector Component ──
+function BranchSelector({ suggestedBranches, onSelectionChange }) {
+  const [btechChecked, setBtechChecked] = React.useState({});
+  const [mtechChecked, setMtechChecked] = React.useState({});
+  const [parentChecked, setParentChecked] = React.useState({});
+  const [allBtech, setAllBtech] = React.useState(false);
+  const [allMtech, setAllMtech] = React.useState(false);
+
+  React.useEffect(() => {
+    if (suggestedBranches) {
+      const suggested = suggestedBranches.toLowerCase();
+      const newBtech = {};
+      BTECH_BRANCHES.forEach(b => { if (suggested.includes(b.toLowerCase())) newBtech[b] = true; });
+      setBtechChecked(newBtech);
+    }
+  }, [suggestedBranches]);
+
+  React.useEffect(() => {
+    const selected = [];
+    Object.entries(btechChecked).forEach(([b, v]) => { if (v) selected.push("BTech:" + b); });
+    MTECH_DATA.forEach(item => {
+      if (item.children.length === 0) {
+        if (mtechChecked[item.parent]) selected.push("MTech:" + item.parent);
+      } else {
+        item.children.forEach(c => { if (mtechChecked[c]) selected.push("MTech:" + c); });
+        if (parentChecked[item.parent] && item.children.length === 0) selected.push("MTech:" + item.parent);
+      }
+    });
+    onSelectionChange(selected);
+  }, [btechChecked, mtechChecked, parentChecked]);
+
+  const toggleAllBtech = (val) => {
+    const s = {}; BTECH_BRANCHES.forEach(b => s[b] = val);
+    setBtechChecked(s); setAllBtech(val);
+    if (!val) setAllMtech(false);
+  };
+  const toggleAllMtech = (val) => {
+    const s = {}; const p = {};
+    MTECH_DATA.forEach(item => {
+      if (item.children.length === 0) { s[item.parent] = val; }
+      else { p[item.parent] = val; item.children.forEach(c => s[c] = val); }
+    });
+    setMtechChecked(s); setParentChecked(p); setAllMtech(val);
+    if (!val) setAllBtech(false);
+  };
+  const toggleParent = (parent, children, val) => {
+    const s = { ...mtechChecked };
+    children.forEach(c => s[c] = val);
+    setMtechChecked(s);
+    setParentChecked(p => ({ ...p, [parent]: val }));
+  };
+  const toggleChild = (child, parent, children) => {
+    const s = { ...mtechChecked, [child]: !mtechChecked[child] };
+    setMtechChecked(s);
+    const allKids = children.every(c => s[c]);
+    setParentChecked(p => ({ ...p, [parent]: allKids }));
+  };
+
+  const chipStyle = (checked) => ({
+    display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12,
+    padding: "4px 10px", borderRadius: 8, cursor: "pointer", userSelect: "none",
+    background: checked ? "#e8f0fe" : "#f4f4f0",
+    border: checked ? "0.5px solid #1a56db" : "0.5px solid rgba(0,0,0,0.12)",
+    color: checked ? "#1a56db" : "#333", fontWeight: checked ? 500 : 400,
+  });
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <label style={{ ...chipStyle(allBtech), background: allBtech ? "#dbeafe" : "#f4f4f0" }}>
+          <input type="checkbox" checked={allBtech} onChange={e => toggleAllBtech(e.target.checked)} style={{ accentColor: "#1a56db" }} />
+          All B.Tech
+        </label>
+        <label style={{ ...chipStyle(allMtech), background: allMtech ? "#d1fae5" : "#f4f4f0", color: allMtech ? "#065f46" : "#333", border: allMtech ? "0.5px solid #065f46" : "0.5px solid rgba(0,0,0,0.12)" }}>
+          <input type="checkbox" checked={allMtech} onChange={e => toggleAllMtech(e.target.checked)} style={{ accentColor: "#065f46" }} />
+          All M.Tech
+        </label>
+        <label style={{ ...chipStyle(allBtech && allMtech) }}>
+          <input type="checkbox" checked={allBtech && allMtech} onChange={e => { toggleAllBtech(e.target.checked); toggleAllMtech(e.target.checked); }} style={{ accentColor: "#1a56db" }} />
+          All (Both)
+        </label>
+      </div>
+
+      <p style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>B.Tech</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+        {BTECH_BRANCHES.map(b => (
+          <label key={b} style={chipStyle(!!btechChecked[b])}>
+            <input type="checkbox" checked={!!btechChecked[b]} onChange={() => setBtechChecked(s => ({ ...s, [b]: !s[b] }))} style={{ accentColor: "#1a56db" }} />
+            {b}
+          </label>
+        ))}
+      </div>
+
+      <p style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>M.Tech</p>
+      {MTECH_DATA.map(item => (
+        <div key={item.parent} style={{ marginBottom: 8 }}>
+          {item.children.length === 0 ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <label style={chipStyle(!!mtechChecked[item.parent])}>
+                <input type="checkbox" checked={!!mtechChecked[item.parent]} onChange={() => setMtechChecked(s => ({ ...s, [item.parent]: !s[item.parent] }))} style={{ accentColor: "#1a56db" }} />
+                {item.parent}
+              </label>
+            </div>
+          ) : (
+            <div>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 5 }}>
+                <input type="checkbox" checked={!!parentChecked[item.parent]} onChange={e => toggleParent(item.parent, item.children, e.target.checked)} style={{ accentColor: "#1a56db" }} />
+                {item.parent}
+              </label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 20 }}>
+                {item.children.map(c => (
+                  <label key={c} style={chipStyle(!!mtechChecked[c])}>
+                    <input type="checkbox" checked={!!mtechChecked[c]} onChange={() => toggleChild(c, item.parent, item.children)} style={{ accentColor: "#1a56db" }} />
+                    {c}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Mail Card Component ──
+function MailCard({ mail, onForward, onSkip }) {
+  const [selected, setSelected] = React.useState([]);
+  const [sending, setSending] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+
+  const handleSend = async () => {
+    if (selected.length === 0) { alert("Please select at least one branch."); return; }
+    setSending(true);
+    const branches = selected.join(",");
+    const result = await onForward(mail.uid, branches);
+    setSending(false);
+    if (result && result.success) setSent(true);
+  };
+
+  if (sent) return (
+    <div style={{ background: "#fff", borderRadius: 12, border: "0.5px solid rgba(0,0,0,0.1)", padding: "1.25rem", marginBottom: 16, opacity: 0.6 }}>
+      <p style={{ fontSize: 14, color: "#065f46", fontWeight: 500 }}>✓ Forwarded — {mail.company}</p>
+    </div>
+  );
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, border: "0.5px solid rgba(0,0,0,0.1)", padding: "1.25rem", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+        <div>
+          <p style={{ fontSize: 16, fontWeight: 500, marginBottom: 3 }}>{mail.company}</p>
+          <p style={{ fontSize: 12, color: "#888" }}>{new Date(mail.date).toLocaleString("en-IN")}</p>
+        </div>
+        <span style={{ fontSize: 11, background: "#fef3c7", color: "#92400e", padding: "3px 10px", borderRadius: 8, fontWeight: 500, whiteSpace: "nowrap" }}>Pending</span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+        {[
+          ["Profile / Role", mail.roles],
+          ["Stipend", mail.stipend],
+          ["Eligibility", mail.eligibility],
+          ["Deadline", mail.deadline],
+        ].map(([label, val]) => (
+          <div key={label} style={{ background: "#f9f9f7", borderRadius: 8, padding: "10px 12px" }}>
+            <p style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>{label}</p>
+            <p style={{ fontSize: 13, fontWeight: 500 }}>{val || "Not mentioned"}</p>
+          </div>
+        ))}
+      </div>
+
+      {mail.summary && (
+        <div style={{ background: "#f0f4ff", borderRadius: 8, padding: "10px 12px", marginBottom: 14, borderLeft: "2px solid #1a56db" }}>
+          <p style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>AI Summary</p>
+          <p style={{ fontSize: 13, lineHeight: 1.6 }}>{mail.summary}</p>
+        </div>
+      )}
+
+      <hr style={{ border: "none", borderTop: "0.5px solid rgba(0,0,0,0.08)", margin: "14px 0" }} />
+      <p style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Select branches to forward to</p>
+
+      <BranchSelector suggestedBranches={mail.suggested_branches} onSelectionChange={setSelected} />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#888" }}>{selected.length} selected</span>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => onSkip(mail.uid)} style={{ fontSize: 12, padding: "5px 14px", cursor: "pointer", background: "transparent", border: "0.5px solid rgba(0,0,0,0.15)", borderRadius: 8, color: "#666" }}>Skip</button>
+        <button onClick={handleSend} disabled={sending} style={{ fontSize: 13, padding: "7px 20px", cursor: "pointer", background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, fontWeight: 500, opacity: sending ? 0.7 : 1 }}>
+          {sending ? "Sending..." : "Send to selected →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ──
+function App() {
+  const [tab, setTab] = React.useState("pending");
+  const [pending, setPending] = React.useState([]);
+  const [allMails, setAllMails] = React.useState([]);
+  const [enquiries, setEnquiries] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+
+  const load = async (t) => {
+    setLoading(true);
+    try {
+      if (t === "pending") { const d = await api("getPending"); setPending(d); }
+      else if (t === "all") { const d = await api("getAllMails"); setAllMails(d); }
+      else if (t === "enquiry") { const d = await api("getEnquiries"); setEnquiries(d); }
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  React.useEffect(() => { load(tab); }, [tab]);
+
+  const handleForward = async (uid, branches) => {
+    const result = await api("forward", { uid, branches });
+    if (result.success) setPending(p => p.filter(m => m.uid !== uid));
+    return result;
+  };
+  const handleSkip = async (uid) => {
+    await api("skip", { uid });
+    setPending(p => p.filter(m => m.uid !== uid));
+  };
+
+  const tabs = [
+    { id: "pending", label: "Pending Decisions", count: pending.length },
+    { id: "all", label: "All Mails Log" },
+    { id: "enquiry", label: "Enquiry Mails" },
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f4f4f0" }}>
+      <div style={{ background: "#fff", borderBottom: "0.5px solid rgba(0,0,0,0.1)", padding: "0 2rem" }}>
+        <div style={{ maxWidth: 800, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
+          <p style={{ fontWeight: 500, fontSize: 16 }}>TnP Control Panel</p>
+          <p style={{ fontSize: 12, color: "#888" }}>IIT Madras</p>
+        </div>
+      </div>
+
+      <div style={{ background: "#fff", borderBottom: "0.5px solid rgba(0,0,0,0.1)" }}>
+        <div style={{ maxWidth: 800, margin: "0 auto", display: "flex", gap: 0 }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              padding: "14px 20px", fontSize: 13, cursor: "pointer", background: "transparent",
+              border: "none", borderBottom: tab === t.id ? "2px solid #1a56db" : "2px solid transparent",
+              color: tab === t.id ? "#1a56db" : "#666", fontWeight: tab === t.id ? 500 : 400,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              {t.label}
+              {t.count > 0 && <span style={{ background: "#fee2e2", color: "#991b1b", fontSize: 11, padding: "1px 7px", borderRadius: 10, fontWeight: 500 }}>{t.count}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 800, margin: "0 auto", padding: "2rem 1rem" }}>
+        {loading && <p style={{ color: "#888", fontSize: 14, textAlign: "center", padding: "2rem" }}>Loading...</p>}
+
+        {!loading && tab === "pending" && (
+          pending.length === 0
+            ? <div style={{ textAlign: "center", padding: "3rem", color: "#888" }}>
+                <p style={{ fontSize: 32, marginBottom: 8 }}>✓</p>
+                <p style={{ fontSize: 15 }}>No pending decisions</p>
+                <p style={{ fontSize: 13, marginTop: 4 }}>All caught up!</p>
+              </div>
+            : pending.map(m => <MailCard key={m.uid} mail={m} onForward={handleForward} onSkip={handleSkip} />)
+        )}
+
+        {!loading && tab === "all" && (
+          <div style={{ background: "#fff", borderRadius: 12, border: "0.5px solid rgba(0,0,0,0.1)", overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#f9f9f7" }}>
+                  {["Date", "Company", "Type", "Status", "Forwarded To"].map(h => (
+                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 500, fontSize: 12, color: "#888", borderBottom: "0.5px solid rgba(0,0,0,0.08)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {allMails.map((m, i) => (
+                  <tr key={m.uid} style={{ borderBottom: "0.5px solid rgba(0,0,0,0.06)", background: i % 2 === 0 ? "#fff" : "#fafaf8" }}>
+                    <td style={{ padding: "10px 14px", color: "#666" }}>{new Date(m.date).toLocaleDateString("en-IN")}</td>
+                    <td style={{ padding: "10px 14px", fontWeight: 500 }}>{m.company}</td>
+                    <td style={{ padding: "10px 14px" }}>
+                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: m.type === "recruitment_all" ? "#d1fae5" : m.type === "recruitment_dept" ? "#e8f0fe" : "#f4f4f0", color: m.type === "recruitment_all" ? "#065f46" : m.type === "recruitment_dept" ? "#1a56db" : "#666" }}>
+                        {m.type}
+                      </span>
+                    </td>
+                    <td style={{ padding: "10px 14px" }}>
+                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: m.status === "forwarded" || m.status === "auto-forwarded" ? "#d1fae5" : m.status === "pending" ? "#fef3c7" : "#f4f4f0", color: m.status === "forwarded" || m.status === "auto-forwarded" ? "#065f46" : m.status === "pending" ? "#92400e" : "#666" }}>
+                        {m.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: "10px 14px", color: "#666", fontSize: 12 }}>{m.forwarded_to || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!loading && tab === "enquiry" && (
+          enquiries.length === 0
+            ? <p style={{ color: "#888", fontSize: 14, textAlign: "center", padding: "3rem" }}>No enquiry mails yet</p>
+            : enquiries.map(m => (
+                <div key={m.uid} style={{ background: "#fff", borderRadius: 12, border: "0.5px solid rgba(0,0,0,0.1)", padding: "1rem 1.25rem", marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <p style={{ fontWeight: 500, fontSize: 14 }}>{m.company}</p>
+                    <p style={{ fontSize: 12, color: "#888" }}>{new Date(m.date).toLocaleDateString("en-IN")}</p>
+                  </div>
+                  <p style={{ fontSize: 13, color: "#555", marginTop: 4 }}>{m.subject}</p>
+                  <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{m.from}</p>
+                </div>
+              ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
