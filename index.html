@@ -56,11 +56,10 @@ const api = async (action, params = {}) => {
   return res.json();
 };
 
-── Branch Selector Component ──
+// ── Branch Selector Component ──
 function BranchSelector({ suggestedBranches, onSelectionChange }) {
   const [btechChecked, setBtechChecked] = React.useState({});
   const [mtechChecked, setMtechChecked] = React.useState({});
-  const [parentChecked, setParentChecked] = React.useState({});
   const [allBtech, setAllBtech] = React.useState(false);
   const [allMtech, setAllMtech] = React.useState(false);
 
@@ -77,15 +76,10 @@ function BranchSelector({ suggestedBranches, onSelectionChange }) {
     const selected = [];
     Object.entries(btechChecked).forEach(([b, v]) => { if (v) selected.push("BTech:" + b); });
     MTECH_DATA.forEach(item => {
-      if (item.children.length === 0) {
-        if (mtechChecked[item.parent]) selected.push("MTech:" + item.parent);
-      } else {
-        item.children.forEach(c => { if (mtechChecked[c]) selected.push("MTech:" + c); });
-        if (parentChecked[item.parent] && item.children.length === 0) selected.push("MTech:" + item.parent);
-      }
+      if (mtechChecked[item.parent]) selected.push("MTech:" + item.parent);
     });
     onSelectionChange(selected);
-  }, [btechChecked, mtechChecked, parentChecked]);
+  }, [btechChecked, mtechChecked]);
 
   const toggleAllBtech = (val) => {
     const s = {}; BTECH_BRANCHES.forEach(b => s[b] = val);
@@ -93,25 +87,10 @@ function BranchSelector({ suggestedBranches, onSelectionChange }) {
     if (!val) setAllMtech(false);
   };
   const toggleAllMtech = (val) => {
-    const s = {}; const p = {};
-    MTECH_DATA.forEach(item => {
-      if (item.children.length === 0) { s[item.parent] = val; }
-      else { p[item.parent] = val; item.children.forEach(c => s[c] = val); }
-    });
-    setMtechChecked(s); setParentChecked(p); setAllMtech(val);
+    const s = {};
+    MTECH_DATA.forEach(item => { s[item.parent] = val; });
+    setMtechChecked(s); setAllMtech(val);
     if (!val) setAllBtech(false);
-  };
-  const toggleParent = (parent, children, val) => {
-    const s = { ...mtechChecked };
-    children.forEach(c => s[c] = val);
-    setMtechChecked(s);
-    setParentChecked(p => ({ ...p, [parent]: val }));
-  };
-  const toggleChild = (child, parent, children) => {
-    const s = { ...mtechChecked, [child]: !mtechChecked[child] };
-    setMtechChecked(s);
-    const allKids = children.every(c => s[c]);
-    setParentChecked(p => ({ ...p, [parent]: allKids }));
   };
 
   const chipStyle = (checked) => ({
@@ -150,38 +129,20 @@ function BranchSelector({ suggestedBranches, onSelectionChange }) {
       </div>
 
       <p style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>M.Tech</p>
-      {MTECH_DATA.map(item => (
-        <div key={item.parent} style={{ marginBottom: 8 }}>
-          {item.children.length === 0 ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <label style={chipStyle(!!mtechChecked[item.parent])}>
-                <input type="checkbox" checked={!!mtechChecked[item.parent]} onChange={() => setMtechChecked(s => ({ ...s, [item.parent]: !s[item.parent] }))} style={{ accentColor: "#1a56db" }} />
-                {item.parent}
-              </label>
-            </div>
-          ) : (
-            <div>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 5 }}>
-                <input type="checkbox" checked={!!parentChecked[item.parent]} onChange={e => toggleParent(item.parent, item.children, e.target.checked)} style={{ accentColor: "#1a56db" }} />
-                {item.parent}
-              </label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 20 }}>
-                {item.children.map(c => (
-                  <label key={c} style={chipStyle(!!mtechChecked[c])}>
-                    <input type="checkbox" checked={!!mtechChecked[c]} onChange={() => toggleChild(c, item.parent, item.children)} style={{ accentColor: "#1a56db" }} />
-                    {c}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {MTECH_DATA.map(item => (
+          <label key={item.parent} style={chipStyle(!!mtechChecked[item.parent])}>
+            <input type="checkbox" checked={!!mtechChecked[item.parent]} onChange={() => setMtechChecked(s => ({ ...s, [item.parent]: !s[item.parent] }))} style={{ accentColor: "#1a56db" }} />
+            {item.parent}
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
+
 // ── Mail Card Component ──
-{/* function MailCard({ mail, onForward, onSkip }) {
+function MailCard({ mail, onForward, onSkip }) {
   const [selected, setSelected] = React.useState([]);
   const [sending, setSending] = React.useState(false);
   const [sent, setSent] = React.useState(false);
@@ -244,137 +205,6 @@ function BranchSelector({ suggestedBranches, onSelectionChange }) {
         <button onClick={handleSend} disabled={sending} style={{ fontSize: 13, padding: "7px 20px", cursor: "pointer", background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, fontWeight: 500, opacity: sending ? 0.7 : 1 }}>
           {sending ? "Sending..." : "Send to selected →"}
         </button>
-      </div>
-    </div>
-  );
-} */}
-function BranchSelector({ suggestedBranches, onSelectionChange }) {
-  const [btechChecked, setBtechChecked] = React.useState({});
-  const [mtechChecked, setMtechChecked] = React.useState({});
-  const [allBtech, setAllBtech] = React.useState(false);
-  const [allMtech, setAllMtech] = React.useState(false);
-
-  // Auto-select from AI suggestions
-  React.useEffect(() => {
-    if (suggestedBranches) {
-      const suggested = suggestedBranches.toLowerCase();
-
-      const newBtech = {};
-      const newMtech = {};
-
-      BTECH_BRANCHES.forEach(b => {
-        if (suggested.includes(b.toLowerCase())) newBtech[b] = true;
-      });
-
-      MTECH_BRANCHES.forEach(b => {
-        if (suggested.includes(b.toLowerCase())) newMtech[b] = true;
-      });
-
-      setBtechChecked(newBtech);
-      setMtechChecked(newMtech);
-    }
-  }, [suggestedBranches]);
-
-  // Emit selected branches
-  React.useEffect(() => {
-    const selected = [];
-
-    Object.entries(btechChecked).forEach(([b, v]) => {
-      if (v) selected.push("BTech:" + b);
-    });
-
-    Object.entries(mtechChecked).forEach(([b, v]) => {
-      if (v) selected.push("MTech:" + b);
-    });
-
-    onSelectionChange(selected);
-  }, [btechChecked, mtechChecked]);
-
-  // Select all handlers
-  const toggleAllBtech = (val) => {
-    const s = {};
-    BTECH_BRANCHES.forEach(b => s[b] = val);
-    setBtechChecked(s);
-    setAllBtech(val);
-  };
-
-  const toggleAllMtech = (val) => {
-    const s = {};
-    MTECH_BRANCHES.forEach(b => s[b] = val);
-    setMtechChecked(s);
-    setAllMtech(val);
-  };
-
-  const chipStyle = (checked) => ({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 5,
-    fontSize: 12,
-    padding: "4px 10px",
-    borderRadius: 8,
-    cursor: "pointer",
-    userSelect: "none",
-    background: checked ? "#e8f0fe" : "#f4f4f0",
-    border: checked ? "0.5px solid #1a56db" : "0.5px solid rgba(0,0,0,0.12)",
-    color: checked ? "#1a56db" : "#333",
-    fontWeight: checked ? 500 : 400,
-  });
-
-  return (
-    <div>
-      {/* Select All */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-        <label style={chipStyle(allBtech)}>
-          <input
-            type="checkbox"
-            checked={allBtech}
-            onChange={e => toggleAllBtech(e.target.checked)}
-          />
-          All B.Tech
-        </label>
-
-        <label style={chipStyle(allMtech)}>
-          <input
-            type="checkbox"
-            checked={allMtech}
-            onChange={e => toggleAllMtech(e.target.checked)}
-          />
-          All M.Tech
-        </label>
-      </div>
-
-      {/* B.Tech */}
-      <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>B.Tech</p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
-        {BTECH_BRANCHES.map(b => (
-          <label key={b} style={chipStyle(!!btechChecked[b])}>
-            <input
-              type="checkbox"
-              checked={!!btechChecked[b]}
-              onChange={() =>
-                setBtechChecked(s => ({ ...s, [b]: !s[b] }))
-              }
-            />
-            {b}
-          </label>
-        ))}
-      </div>
-
-      {/* M.Tech */}
-      <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>M.Tech</p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {MTECH_BRANCHES.map(b => (
-          <label key={b} style={chipStyle(!!mtechChecked[b])}>
-            <input
-              type="checkbox"
-              checked={!!mtechChecked[b]}
-              onChange={() =>
-                setMtechChecked(s => ({ ...s, [b]: !s[b] }))
-              }
-            />
-            {b}
-          </label>
-        ))}
       </div>
     </div>
   );
